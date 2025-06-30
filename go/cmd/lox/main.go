@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/Shresth72/lox/cmd/internal/lox"
+	"github.com/Shresth72/lox/internal/lox"
 )
 
 func main() {

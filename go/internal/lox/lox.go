@@ -49,7 +49,7 @@ func (l *Lox) run(source string) {
 	tokens := scanner.scanTokens()
 
 	for _, token := range tokens {
-		fmt.Println(token)
+		fmt.Println(token.String())
 	}
 }
 
