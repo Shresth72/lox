@@ -72,13 +72,7 @@ func (s *Scanner) scanToken() {
 		s.addMatchToken('=', GREATER_EQUAL, GREATER)
 
 	case '/':
-		if s.match('/') {
-			for s.peek() != '\n' && !s.isAtEnd() {
-				s.advance()
-			}
-		} else {
-			s.addToken(SLASH)
-		}
+		s.captureComment()
 
 	case '"':
 		s.captureString()
@@ -142,7 +136,36 @@ func (s *Scanner) captureIdentifier() {
 	for s.isAlphaNumeric(s.peek()) {
 		s.advance()
 	}
-	s.addToken(IDENTIFIER)
+
+	text := s.source[s.start:s.current]
+	tokenType, ok := keywords[text]
+	if !ok {
+		tokenType = IDENTIFIER
+	}
+	s.addToken(tokenType)
+}
+
+func (s *Scanner) captureComment() {
+	if s.match('/') {
+		for s.peek() != '\n' && !s.isAtEnd() {
+			s.advance()
+		}
+	} else if s.match('*') {
+		for !s.isAtEnd() {
+			if s.peek() == '*' && s.peekNext() == '/' {
+				s.advance()
+				s.advance()
+				return
+			}
+			if s.peek() == '\n' {
+				s.line++
+			}
+			s.advance()
+		}
+		s.lox.error(s.line, "Unterminated block comment")
+	} else {
+		s.addToken(SLASH)
+	}
 }
 
 func (s *Scanner) addMatchToken(expected byte, first, second TokenType) {

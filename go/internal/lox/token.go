@@ -24,6 +24,25 @@ func (t *Token) String() string {
 	return fmt.Sprintf("%s %s %v", t.tokenType, t.lexeme, t.literal)
 }
 
+var keywords = map[string]TokenType{
+	"and":    AND,
+	"class":  CLASS,
+	"else":   ELSE,
+	"false":  FALSE,
+	"for":    FOR,
+	"fun":    FUN,
+	"if":     IF,
+	"nil":    NIL,
+	"or":     OR,
+	"print":  PRINT,
+	"return": RETURN,
+	"super":  SUPER,
+	"this":   THIS,
+	"true":   TRUE,
+	"var":    VAR,
+	"while":  WHILE,
+}
+
 const (
 	// Single-character tokens.
 	LEFT_PAREN TokenType = iota
