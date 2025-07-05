@@ -20,6 +20,10 @@ func NewToken(tokenType TokenType, lexeme string, literal any, line int) *Token 
 	}
 }
 
+func (t *Token) GetLexeme() string {
+	return t.lexeme
+}
+
 func (t *Token) String() string {
 	return fmt.Sprintf("%s %s %v", t.tokenType, t.lexeme, t.literal)
 }

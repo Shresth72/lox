@@ -13,29 +13,41 @@ func main() {
 		fmt.Println("Usage: tool <command> [args]")
 		os.Exit(64)
 	}
+
 	command := os.Args[1]
 
-	if command == "generate_ast" {
-		var outputDir string
-		if len(os.Args) != 3 {
-			projectRoot, err := findProjectRoot()
-			if err != nil {
-				fmt.Println("Error: could not determine project root:", err)
-				os.Exit(1)
-			}
-			outputDir = filepath.Join(projectRoot, "internal", "lox")
-		} else {
-			outputDir = os.Args[2]
-		}
+	switch command {
+	case "generate_ast":
+		runGenerateAst()
+	case "print_ast":
+		runPrintAst()
+	default:
+		fmt.Printf("Tool: %s not supported\n", command)
+	}
+}
 
-		ast := tool.NewAST()
-		if err := ast.GenerateAST(outputDir); err != nil {
-			fmt.Println("Error:", err)
+func runGenerateAst() {
+	var outputDir string
+	if len(os.Args) != 3 {
+		projectRoot, err := findProjectRoot()
+		if err != nil {
+			fmt.Println("Error: could not determine project root:", err)
 			os.Exit(1)
 		}
+		outputDir = filepath.Join(projectRoot, "internal", "lox")
 	} else {
-		fmt.Printf("Tool: %s not supported\n", os.Args[1])
+		outputDir = os.Args[2]
 	}
+
+	ast := tool.NewAST()
+	if err := ast.GenerateAST(outputDir); err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+}
+
+func runPrintAst() {
+	fmt.Printf("Example AST: %s\n", tool.ExampleAst())
 }
 
 func findProjectRoot() (string, error) {

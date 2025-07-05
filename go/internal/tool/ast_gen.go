@@ -71,8 +71,10 @@ func (ast *AST) defineType(file *os.File, baseName, className, fieldList string)
 		file.WriteString(s + "\n")
 	}
 
+	// Struct definition
 	write(fmt.Sprintf("\ntype %s struct {", className))
-	for _, field := range strings.Split(fieldList, ",") {
+	fields := strings.Split(fieldList, ",")
+	for _, field := range fields {
 		field = strings.TrimSpace(field)
 		fieldParts := strings.SplitN(field, " ", 2)
 		fieldType := strings.TrimSpace(fieldParts[0])
@@ -81,6 +83,25 @@ func (ast *AST) defineType(file *os.File, baseName, className, fieldList string)
 	}
 	write("}")
 
+	// Constructor
+	write(
+		fmt.Sprintf(
+			"\nfunc New%s(%s) *%s {",
+			className,
+			formatConstructorParams(fields),
+			className,
+		),
+	)
+	write("    return &" + className + "{")
+	for _, field := range fields {
+		field = strings.TrimSpace(field)
+		fieldName := strings.TrimSpace(strings.SplitN(field, " ", 2)[1])
+		write(fmt.Sprintf("        %s: %s,", capitalize(fieldName), fieldName))
+	}
+	write("    }")
+	write("}")
+
+	// Accept method
 	write(fmt.Sprintf("\nfunc (e *%s) Accept(v %sVisitor) interface{} {", className, baseName))
 	write(fmt.Sprintf("    return v.Visit%s%s(e)", className, baseName))
 	write("}")
@@ -105,4 +126,16 @@ func capitalize(name string) string {
 		return ""
 	}
 	return strings.ToUpper(name[:1]) + name[1:]
+}
+
+func formatConstructorParams(fields []string) string {
+	params := make([]string, len(fields))
+	for i, field := range fields {
+		field = strings.TrimSpace(field)
+		parts := strings.SplitN(field, " ", 2)
+		fieldType := strings.TrimSpace(parts[0])
+		fieldName := strings.TrimSpace(parts[1])
+		params[i] = fmt.Sprintf("%s %s", fieldName, fieldType)
+	}
+	return strings.Join(params, ", ")
 }

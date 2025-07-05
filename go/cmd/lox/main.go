@@ -8,8 +8,6 @@ import (
 )
 
 func main() {
-	// fmt.Printf("Example AST: %s\n", _lox.ExampleAst())
-
 	lox := _lox.NewLox()
 	if len(os.Args) > 2 {
 		fmt.Println("Usage: lox {script}")
