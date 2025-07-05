@@ -1,16 +1,21 @@
 package lox
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type Parser struct {
 	tokens  []Token
 	current int
-
-	lox *Lox
+	lox     *Lox
 }
 
 type ParseError struct {
-	error
+	msg string
+}
+
+func (e *ParseError) Error() string {
+	return e.msg
 }
 
 func NewParser(tokens []Token, l *Lox) *Parser {
@@ -21,21 +26,25 @@ func NewParser(tokens []Token, l *Lox) *Parser {
 	}
 }
 
-func NewParseError(err error) *ParseError {
-	return &ParseError{err}
+func NewParseError(msg string) *ParseError {
+	return &ParseError{msg: msg}
 }
 
-func (p *Parser) Parse() (expr Expr, err error) {
+func (p *Parser) Parse() (Expr, error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("parse error: %v", r)
+			p.lox.hadError = true
 		}
 	}()
 
-	return p.expression(), nil
+	expr := p.expression()
+	if p.lox.hadError {
+		return nil, fmt.Errorf("parse error")
+	}
+	return expr, nil
 }
 
-// Expressions
+// Expression parsing methods
 func (p *Parser) expression() Expr {
 	return p.equality()
 }
@@ -105,7 +114,7 @@ func (p *Parser) primary() Expr {
 	}
 
 	if p.match(NUMBER, STRING) {
-		return NewLiteral(p.previous().literal)
+		return NewLiteral(p.previous().Literal)
 	}
 
 	if p.match(LEFT_PAREN) {
@@ -117,7 +126,7 @@ func (p *Parser) primary() Expr {
 	panic(p.error(p.peek(), "Expect expression."))
 }
 
-// ERRORS
+// Error handling
 func (p *Parser) consume(tokenType TokenType, message string) Token {
 	if p.check(tokenType) {
 		return p.advance()
@@ -126,13 +135,32 @@ func (p *Parser) consume(tokenType TokenType, message string) Token {
 }
 
 func (p *Parser) error(token Token, message string) *ParseError {
-	p.lox.error(token.line, message)
-	return NewParseError(
-		fmt.Errorf("[line %d] Error at '%s': %s", token.line, token.lexeme, message),
-	)
+	if token.Type == EOF {
+		p.lox.report(token.Line, "at end", message)
+	} else {
+		p.lox.report(token.Line, "at '"+token.Lexeme+"'", message)
+	}
+	return NewParseError(fmt.Sprintf("[line %d] Error: %s", token.Line, message))
 }
 
-// UTILS
+func (p *Parser) synchronize() {
+	p.advance()
+
+	for !p.isAtEnd() {
+		if p.previous().Type == SEMICOLON {
+			return
+		}
+
+		switch p.peek().Type {
+		case CLASS, FUN, VAR, FOR, IF, WHILE, PRINT, RETURN:
+			return
+		}
+
+		p.advance()
+	}
+}
+
+// Utility methods
 func (p *Parser) match(tokenTypes ...TokenType) bool {
 	for _, tokenType := range tokenTypes {
 		if p.check(tokenType) {
@@ -147,7 +175,7 @@ func (p *Parser) check(tokenType TokenType) bool {
 	if p.isAtEnd() {
 		return false
 	}
-	return p.peek().tokenType == tokenType
+	return p.peek().Type == tokenType
 }
 
 func (p *Parser) advance() Token {
@@ -158,7 +186,7 @@ func (p *Parser) advance() Token {
 }
 
 func (p *Parser) isAtEnd() bool {
-	return p.peek().tokenType == EOF
+	return p.peek().Type == EOF
 }
 
 func (p *Parser) peek() Token {

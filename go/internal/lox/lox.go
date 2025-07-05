@@ -58,8 +58,10 @@ func (l *Lox) run(source string) {
 		return
 	}
 
-	astPrinter := NewAstPrinter()
-	fmt.Printf("AST: %s\n", astPrinter.Print(expr))
+	if expr != nil {
+		astPrinter := NewAstPrinter()
+		fmt.Printf("AST: %s\n", astPrinter.Print(expr))
+	}
 }
 
 func (l *Lox) error(line int, message string) {
@@ -67,6 +69,6 @@ func (l *Lox) error(line int, message string) {
 }
 
 func (l *Lox) report(line int, where, message string) {
-	fmt.Printf("%v: [line %d] Error %s: %s\n", os.Stderr, line, where, message)
+	fmt.Fprintf(os.Stderr, "[line %d] Error %s: %s\n", line, where, message)
 	l.hadError = true
 }

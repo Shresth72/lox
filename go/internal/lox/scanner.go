@@ -78,6 +78,7 @@ func (s *Scanner) scanToken() {
 		s.captureString()
 
 	case ' ', '\r', '\t':
+		// Ignore whitespace
 	case '\n':
 		s.line++
 

@@ -5,27 +5,23 @@ import "fmt"
 type TokenType int
 
 type Token struct {
-	tokenType TokenType
-	lexeme    string
-	literal   any
-	line      int
+	Type    TokenType
+	Lexeme  string
+	Literal any
+	Line    int
 }
 
 func NewToken(tokenType TokenType, lexeme string, literal any, line int) *Token {
 	return &Token{
-		tokenType: tokenType,
-		lexeme:    lexeme,
-		literal:   literal,
-		line:      line,
+		Type:    tokenType,
+		Lexeme:  lexeme,
+		Literal: literal,
+		Line:    line,
 	}
 }
 
-func (t *Token) GetLexeme() string {
-	return t.lexeme
-}
-
 func (t *Token) String() string {
-	return fmt.Sprintf("%s %s %v", t.tokenType, t.lexeme, t.literal)
+	return fmt.Sprintf("%s %s %v", t.Type, t.Lexeme, t.Literal)
 }
 
 var keywords = map[string]TokenType{
