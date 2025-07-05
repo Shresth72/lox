@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/Shresth72/lox/internal/lox"
 	"github.com/Shresth72/lox/internal/tool"
 )
 
@@ -47,7 +48,7 @@ func runGenerateAst() {
 }
 
 func runPrintAst() {
-	fmt.Printf("Example AST: %s\n", tool.ExampleAst())
+	fmt.Printf("Example AST: %s\n", lox.ExampleAst())
 }
 
 func findProjectRoot() (string, error) {

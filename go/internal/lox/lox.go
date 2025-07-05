@@ -48,9 +48,18 @@ func (l *Lox) run(source string) {
 	scanner := NewScanner(source, l)
 	tokens := scanner.scanTokens()
 
-	for _, token := range tokens {
-		fmt.Println(token.String())
+	// for _, token := range tokens {
+	// 	fmt.Println(token.String())
+	// }
+
+	parser := NewParser(tokens, l)
+	expr, err := parser.Parse()
+	if err != nil {
+		return
 	}
+
+	astPrinter := NewAstPrinter()
+	fmt.Printf("AST: %s\n", astPrinter.Print(expr))
 }
 
 func (l *Lox) error(line int, message string) {
