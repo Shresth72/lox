@@ -1,57 +1,58 @@
 package lox
 
-import (
-	"fmt"
-)
+import "fmt"
+
+type ParseError struct {
+	Token   Token
+	Message string
+}
+
+func (e *ParseError) Error() string {
+	if e.Token.Type == EOF {
+		return fmt.Sprintf("[line %d] Error at end: %s", e.Token.Line, e.Message)
+	}
+	return fmt.Sprintf("[line %d] Error at '%s': %s", e.Token.Line, e.Token.Lexeme, e.Message)
+}
 
 type Parser struct {
 	tokens  []Token
 	current int
-	lox     *Lox
+	errors  []error
 }
 
-type ParseError struct {
-	msg string
-}
-
-func (e *ParseError) Error() string {
-	return e.msg
-}
-
-func NewParser(tokens []Token, l *Lox) *Parser {
+func NewParser(tokens []Token) *Parser {
 	return &Parser{
 		tokens:  tokens,
 		current: 0,
-		lox:     l,
+		errors:  []error{},
 	}
 }
 
-func NewParseError(msg string) *ParseError {
-	return &ParseError{msg: msg}
-}
-
-func (p *Parser) Parse() (Expr, error) {
+func (p *Parser) Parse() (Expr, []error) {
 	defer func() {
 		if r := recover(); r != nil {
-			p.lox.hadError = true
+			if parseErr, ok := r.(*ParseError); ok {
+				p.errors = append(p.errors, parseErr)
+			} else {
+				panic(r)
+			}
 		}
 	}()
 
 	expr := p.expression()
-	if p.lox.hadError {
-		return nil, fmt.Errorf("parse error")
+
+	if len(p.errors) > 0 {
+		return nil, p.errors
 	}
 	return expr, nil
 }
 
-// Expression parsing methods
 func (p *Parser) expression() Expr {
 	return p.equality()
 }
 
 func (p *Parser) equality() Expr {
 	expr := p.comparison()
-
 	for p.match(BANG_EQUAL, EQUAL_EQUAL) {
 		operator := p.previous()
 		right := p.comparison()
@@ -62,7 +63,6 @@ func (p *Parser) equality() Expr {
 
 func (p *Parser) comparison() Expr {
 	expr := p.term()
-
 	for p.match(GREATER, GREATER_EQUAL, LESS, LESS_EQUAL) {
 		operator := p.previous()
 		right := p.term()
@@ -73,7 +73,6 @@ func (p *Parser) comparison() Expr {
 
 func (p *Parser) term() Expr {
 	expr := p.factor()
-
 	for p.match(MINUS, PLUS) {
 		operator := p.previous()
 		right := p.factor()
@@ -84,7 +83,6 @@ func (p *Parser) term() Expr {
 
 func (p *Parser) factor() Expr {
 	expr := p.unary()
-
 	for p.match(SLASH, STAR) {
 		operator := p.previous()
 		right := p.unary()
@@ -112,55 +110,44 @@ func (p *Parser) primary() Expr {
 	if p.match(NIL) {
 		return NewLiteral(nil)
 	}
-
 	if p.match(NUMBER, STRING) {
 		return NewLiteral(p.previous().Literal)
 	}
-
 	if p.match(LEFT_PAREN) {
 		expr := p.expression()
 		p.consume(RIGHT_PAREN, "Expect ')' after expression")
 		return NewGrouping(expr)
 	}
-
-	panic(p.error(p.peek(), "Expect expression."))
+	panic(&ParseError{
+		Token:   p.peek(),
+		Message: "Expect expression.",
+	})
 }
 
-// Error handling
 func (p *Parser) consume(tokenType TokenType, message string) Token {
 	if p.check(tokenType) {
 		return p.advance()
 	}
-	panic(p.error(p.peek(), message))
-}
-
-func (p *Parser) error(token Token, message string) *ParseError {
-	if token.Type == EOF {
-		p.lox.report(token.Line, "at end", message)
-	} else {
-		p.lox.report(token.Line, "at '"+token.Lexeme+"'", message)
-	}
-	return NewParseError(fmt.Sprintf("[line %d] Error: %s", token.Line, message))
+	panic(&ParseError{
+		Token:   p.peek(),
+		Message: message,
+	})
 }
 
 func (p *Parser) synchronize() {
 	p.advance()
-
 	for !p.isAtEnd() {
 		if p.previous().Type == SEMICOLON {
 			return
 		}
-
 		switch p.peek().Type {
 		case CLASS, FUN, VAR, FOR, IF, WHILE, PRINT, RETURN:
 			return
 		}
-
 		p.advance()
 	}
 }
 
-// Utility methods
 func (p *Parser) match(tokenTypes ...TokenType) bool {
 	for _, tokenType := range tokenTypes {
 		if p.check(tokenType) {

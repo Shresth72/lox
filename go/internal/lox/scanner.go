@@ -5,29 +5,36 @@ import (
 	"strconv"
 )
 
-type Scanner struct {
-	source string
-	tokens []Token
+type ScanError struct {
+	Line    int
+	Message string
+}
 
+func (e *ScanError) Error() string {
+	return fmt.Sprintf("[line %d] %s", e.Line, e.Message)
+}
+
+type Scanner struct {
+	source  string
+	tokens  []Token
 	start   int
 	current int
 	line    int
-
-	lox *Lox
+	errors  []error
 }
 
-func NewScanner(source string, lox *Lox) *Scanner {
+func NewScanner(source string) *Scanner {
 	return &Scanner{
 		source:  source,
 		tokens:  []Token{},
 		start:   0,
 		current: 0,
 		line:    1,
-		lox:     lox,
+		errors:  []error{},
 	}
 }
 
-func (s *Scanner) scanTokens() []Token {
+func (s *Scanner) ScanTokens() ([]Token, []error) {
 	for !s.isAtEnd() {
 		s.start = s.current
 		s.scanToken()
@@ -35,7 +42,7 @@ func (s *Scanner) scanTokens() []Token {
 
 	token := NewToken(EOF, "", nil, s.line)
 	s.tokens = append(s.tokens, *token)
-	return s.tokens
+	return s.tokens, s.errors
 }
 
 func (s *Scanner) scanToken() {
@@ -61,7 +68,6 @@ func (s *Scanner) scanToken() {
 		s.addToken(SEMICOLON)
 	case '*':
 		s.addToken(STAR)
-
 	case '!':
 		s.addMatchToken('=', BANG_EQUAL, BANG)
 	case '=':
@@ -70,25 +76,21 @@ func (s *Scanner) scanToken() {
 		s.addMatchToken('=', LESS_EQUAL, LESS)
 	case '>':
 		s.addMatchToken('=', GREATER_EQUAL, GREATER)
-
 	case '/':
 		s.captureComment()
-
 	case '"':
 		s.captureString()
-
 	case ' ', '\r', '\t':
 		// Ignore whitespace
 	case '\n':
 		s.line++
-
 	default:
 		if s.isDigit(c) {
 			s.captureNumber()
 		} else if s.isAlpha(c) {
 			s.captureIdentifier()
 		} else {
-			s.lox.error(s.line, fmt.Sprintf("Unexpected character: %q", c))
+			s.addError(fmt.Sprintf("Unexpected character: %q", c))
 		}
 	}
 }
@@ -102,7 +104,7 @@ func (s *Scanner) captureString() {
 	}
 
 	if s.isAtEnd() {
-		s.lox.error(s.line, "Unterminated string")
+		s.addError("Unterminated string.")
 		return
 	}
 	s.advance()
@@ -118,7 +120,6 @@ func (s *Scanner) captureNumber() {
 
 	if s.peek() == '.' && s.isDigit(s.peekNext()) {
 		s.advance()
-
 		for s.isDigit(s.peek()) {
 			s.advance()
 		}
@@ -127,7 +128,7 @@ func (s *Scanner) captureNumber() {
 	text := s.source[s.start:s.current]
 	value, err := strconv.ParseFloat(text, 64)
 	if err != nil {
-		s.lox.error(s.line, "Invalid number format")
+		s.addError("Invalid number format")
 		return
 	}
 	s.addTokenWithLiteral(NUMBER, value)
@@ -163,10 +164,17 @@ func (s *Scanner) captureComment() {
 			}
 			s.advance()
 		}
-		s.lox.error(s.line, "Unterminated block comment")
+		s.addError("Unterminated block comment.")
 	} else {
 		s.addToken(SLASH)
 	}
+}
+
+func (s *Scanner) addError(message string) {
+	s.errors = append(s.errors, &ScanError{
+		Line:    s.line,
+		Message: message,
+	})
 }
 
 func (s *Scanner) addMatchToken(expected byte, first, second TokenType) {
@@ -194,7 +202,6 @@ func (s *Scanner) match(expected byte) bool {
 	if s.source[s.current] != expected {
 		return false
 	}
-
 	s.current++
 	return true
 }

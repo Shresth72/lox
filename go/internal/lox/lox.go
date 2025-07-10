@@ -8,12 +8,16 @@ import (
 )
 
 type Lox struct {
-	hadError bool
+	hadError        bool
+	hadRuntimeError bool
+	interpreter     *Interpreter
 }
 
 func NewLox() *Lox {
 	return &Lox{
-		hadError: false,
+		hadError:        false,
+		hadRuntimeError: false,
+		interpreter:     NewInterpreter(),
 	}
 }
 
@@ -23,10 +27,12 @@ func (l *Lox) RunFile(path string) {
 		fmt.Println("Error reading file: ", err.Error())
 		os.Exit(1)
 	}
-
 	l.run(string(bytes))
 	if l.hadError {
 		os.Exit(65)
+	}
+	if l.hadRuntimeError {
+		os.Exit(70)
 	}
 }
 
@@ -38,37 +44,54 @@ func (l *Lox) RunPrompt() {
 		if err != nil {
 			break
 		}
-
 		l.run(strings.TrimSpace(line))
 		l.hadError = false
+		l.hadRuntimeError = false
 	}
 }
 
 func (l *Lox) run(source string) {
-	scanner := NewScanner(source, l)
-	tokens := scanner.scanTokens()
+	// Scanning
+	scanner := NewScanner(source)
+	tokens, scanErrors := scanner.ScanTokens()
 
-	// for _, token := range tokens {
-	// 	fmt.Println(token.String())
-	// }
-
-	parser := NewParser(tokens, l)
-	expr, err := parser.Parse()
-	if err != nil {
+	// Report scan errors
+	for _, err := range scanErrors {
+		l.reportError(err)
+	}
+	if len(scanErrors) > 0 {
+		l.hadError = true
 		return
 	}
 
-	if expr != nil {
-		astPrinter := NewAstPrinter()
-		fmt.Printf("AST: %s\n", astPrinter.Print(expr))
+	// Parsing
+	parser := NewParser(tokens)
+	expression, parseErrors := parser.Parse()
+
+	// Report parse errors
+	for _, err := range parseErrors {
+		l.reportError(err)
 	}
+	if len(parseErrors) > 0 {
+		l.hadError = true
+		return
+	}
+
+	// Interpreting
+	result, err := l.interpreter.Interpret(expression)
+	if err != nil {
+		l.reportRuntimeError(err)
+		l.hadRuntimeError = true
+		return
+	}
+
+	fmt.Println(result)
 }
 
-func (l *Lox) error(line int, message string) {
-	l.report(line, "", message)
+func (l *Lox) reportError(err error) {
+	fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 }
 
-func (l *Lox) report(line int, where, message string) {
-	fmt.Fprintf(os.Stderr, "[line %d] Error %s: %s\n", line, where, message)
-	l.hadError = true
+func (l *Lox) reportRuntimeError(err error) {
+	fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 }
