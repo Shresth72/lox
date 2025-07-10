@@ -1,52 +1,47 @@
 package lox
 
-import "fmt"
-
-type ParseError struct {
-	Token   Token
-	Message string
-}
-
-func (e *ParseError) Error() string {
-	if e.Token.Type == EOF {
-		return fmt.Sprintf("[line %d] Error at end: %s", e.Token.Line, e.Message)
-	}
-	return fmt.Sprintf("[line %d] Error at '%s': %s", e.Token.Line, e.Token.Lexeme, e.Message)
-}
+import (
+	"fmt"
+)
 
 type Parser struct {
 	tokens  []Token
 	current int
-	errors  []error
+	lox     *Lox
 }
 
-func NewParser(tokens []Token) *Parser {
+type ParseError struct {
+	msg string
+}
+
+func NewParser(tokens []Token, l *Lox) *Parser {
 	return &Parser{
 		tokens:  tokens,
 		current: 0,
-		errors:  []error{},
+		lox:     l,
 	}
 }
 
-func (p *Parser) Parse() (Expr, []error) {
+func NewParseError(msg string) *ParseError {
+	return &ParseError{msg: msg}
+}
+func (p *Parser) Parse() (Expr, error) {
 	defer func() {
 		if r := recover(); r != nil {
-			if parseErr, ok := r.(*ParseError); ok {
-				p.errors = append(p.errors, parseErr)
-			} else {
-				panic(r)
-			}
+			p.lox.hadError = true
 		}
 	}()
-
 	expr := p.expression()
 
-	if len(p.errors) > 0 {
-		return nil, p.errors
+	// Always consume atleast one token to move forward
+	p.advance()
+	if p.lox.hadError {
+		return nil, fmt.Errorf("parse error")
 	}
 	return expr, nil
 }
 
+// Expression parsing methods
 func (p *Parser) expression() Expr {
 	return p.equality()
 }
@@ -118,20 +113,22 @@ func (p *Parser) primary() Expr {
 		p.consume(RIGHT_PAREN, "Expect ')' after expression")
 		return NewGrouping(expr)
 	}
-	panic(&ParseError{
-		Token:   p.peek(),
-		Message: "Expect expression.",
-	})
+	panic(p.error(p.peek(), "Expect expression."))
 }
 
+// Error handling
 func (p *Parser) consume(tokenType TokenType, message string) Token {
 	if p.check(tokenType) {
 		return p.advance()
 	}
-	panic(&ParseError{
-		Token:   p.peek(),
-		Message: message,
-	})
+	panic(p.error(p.peek(), message))
+}
+
+func (p *Parser) error(token Token, message string) error {
+	if token.Type == EOF {
+		return p.lox.report(token.Line, "at end", message)
+	}
+	return p.lox.report(token.Line, "at '"+token.Lexeme+"'", message)
 }
 
 func (p *Parser) synchronize() {
@@ -148,6 +145,7 @@ func (p *Parser) synchronize() {
 	}
 }
 
+// Utility methods
 func (p *Parser) match(tokenTypes ...TokenType) bool {
 	for _, tokenType := range tokenTypes {
 		if p.check(tokenType) {

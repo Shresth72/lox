@@ -20,16 +20,33 @@ func NewInterpreter() *Interpreter {
 func (i *Interpreter) Interpret(expr Expr) (string, error) {
 	defer func() {
 		if r := recover(); r != nil {
-			if runtimeErr, ok := r.(*RuntimeError); ok {
-				panic(runtimeErr)
+			if _, ok := r.(*RuntimeError); ok {
 			} else {
 				panic(r)
 			}
 		}
 	}()
 
-	value := i.evaluate(expr)
-	return i.stringify(value), nil
+	// Capture runtime error if one occurs
+	var result string
+	var err error
+
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				if runtimeErr, ok := r.(*RuntimeError); ok {
+					err = runtimeErr
+				} else {
+					panic(r)
+				}
+			}
+		}()
+
+		value := i.evaluate(expr)
+		result = i.stringify(value)
+	}()
+
+	return result, err
 }
 
 func (i *Interpreter) VisitBinaryExpr(expr *Binary) interface{} {
