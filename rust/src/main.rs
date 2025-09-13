@@ -1,34 +1,39 @@
-use std::env;
+use clap::Parser;
+use clap::Subcommand;
+use miette::{IntoDiagnostic, WrapErr};
 use std::fs;
+use std::path::PathBuf;
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 3 {
-        eprintln!("Usage: {} tokenize <filename>", args[0]);
-        return;
-    }
+use lox::*;
 
-    let command = &args[1];
-    let filename = &args[2];
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    #[command(subcommand)]
+    command: Commands,
+}
 
-    match command.as_str() {
-        "tokenize" => {
-            eprintln!("Logs from your program will appear here!");
+#[derive(Subcommand, Debug)]
+enum Commands {
+    Tokenize { filename: PathBuf },
+}
 
-            let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
-                eprintln!("Failed to read file {}", filename);
-                String::new()
-            });
+fn main() -> miette::Result<()> {
+    let args = Args::parse();
+    match args.command {
+        Commands::Tokenize { filename } => {
+            let file_contents = fs::read_to_string(&filename)
+                .into_diagnostic()
+                .wrap_err_with(|| format!("Reading '{}' failed", filename.display()))?;
 
-            if !file_contents.is_empty() {
-                panic!("Scanner not implemented");
-            } else {
-                println!("EOF null");
+            let lexer = Lexer::new(&file_contents);
+            for token in lexer {
+                let token = token?;
+                println!("{token}");
             }
-        }
-        _ => {
-            eprintln!("Unknown command: {}", command);
-            return;
+            println!("EOF null");
         }
     }
+
+    Ok(())
 }
