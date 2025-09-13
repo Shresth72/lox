@@ -25,6 +25,7 @@ func NewParser(tokens []Token, l *Lox) *Parser {
 func NewParseError(msg string) *ParseError {
 	return &ParseError{msg: msg}
 }
+
 func (p *Parser) Parse() (Expr, error) {
 	defer func() {
 		if r := recover(); r != nil {
