@@ -1,5 +1,6 @@
 use clap::Parser;
 use clap::Subcommand;
+use lox::error::SingleTokenError;
 use miette::{IntoDiagnostic, WrapErr};
 use std::fs;
 use std::path::PathBuf;
@@ -28,10 +29,24 @@ fn main() -> miette::Result<()> {
 
             let lexer = Lexer::new(&file_contents);
             for token in lexer {
-                let token = token?;
+                let token = match token {
+                    Ok(t) => t,
+                    Err(e) => {
+                        if let Some(unrecognized) = e.downcast_ref::<SingleTokenError>() {
+                            eprintln!("{e:?}");
+                            eprintln!(
+                                "[line {}] Error: Unexpected character: {}",
+                                unrecognized.line(),
+                                unrecognized.token
+                            );
+                            std::process::exit(65);
+                        }
+                        return Err(e);
+                    }
+                };
                 println!("{token}");
             }
-            println!("EOF null");
+            println!("EOF  null");
         }
     }
 
