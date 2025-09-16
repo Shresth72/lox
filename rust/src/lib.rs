@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use std::fmt;
 
 pub mod error;
-use error::SingleTokenError;
+use error::*;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Token<'de> {
@@ -78,7 +78,7 @@ impl fmt::Display for Token<'_> {
             TokenKind::Greater => write!(f, "GREATER {origin} null"),
             TokenKind::Slash => write!(f, "SLASH {origin} null"),
 
-            TokenKind::String => write!(f, "STRING \"{origin}\" {}", Token::unescape(origin)),
+            TokenKind::String => write!(f, "STRING {origin} {}", Token::unescape(origin)),
             TokenKind::Ident => write!(f, "IDENTIFIER {origin} null"),
             TokenKind::Number(n) => write!(f, "NUMBER {origin} {n}"),
 
@@ -102,8 +102,8 @@ impl fmt::Display for Token<'_> {
 }
 
 impl Token<'_> {
-    pub fn unescape<'de>(_s: &'de str) -> Cow<'de, str> {
-        todo!()
+    pub fn unescape<'de>(s: &'de str) -> Cow<'de, str> {
+        Cow::Borrowed(s.trim_matches('"'))
     }
 }
 
@@ -140,6 +140,7 @@ impl<'de> Iterator for Lexer<'de> {
                 String,
                 Number,
                 Ident,
+                Slash,
                 IfEqualElse(TokenKind, TokenKind),
             }
 
@@ -161,7 +162,7 @@ impl<'de> Iterator for Lexer<'de> {
                 '+' => return just(TokenKind::Plus),
                 ';' => return just(TokenKind::Semicolon),
                 '*' => return just(TokenKind::Star),
-                '/' => return just(TokenKind::Slash),
+                '/' => Started::Slash,
 
                 '<' => Started::IfEqualElse(TokenKind::LessEqual, TokenKind::Less),
                 '>' => Started::IfEqualElse(TokenKind::GreaterEqual, TokenKind::Greater),
@@ -184,7 +185,39 @@ impl<'de> Iterator for Lexer<'de> {
             };
 
             break match started {
-                Started::String => todo!(),
+                Started::String => {
+                    if let Some(end) = self.rest.find('"') {
+                        let literal = &c_onwards[..end + 1 + 1];
+                        self.byte += end + 1;
+                        self.rest = &self.rest[end + 1..];
+                        Some(Ok(Token {
+                            origin: literal,
+                            kind: TokenKind::String,
+                        }))
+                    } else {
+                        let err = StringTerminationError {
+                            src: self.whole.to_string(),
+                            err_span: SourceSpan::from(self.byte - c.len_utf8()..self.whole.len()),
+                        };
+                        self.byte += self.rest.len();
+                        self.rest = &self.rest[self.rest.len()..];
+                        Some(Err(err.into()))
+                    }
+                }
+
+                Started::Slash => {
+                    if self.rest.starts_with('/') {
+                        let line_end = self.rest.find('\n').unwrap_or_else(|| self.rest.len());
+                        self.byte += line_end;
+                        self.rest = &self.rest[line_end..];
+                        continue;
+                    } else {
+                        Some(Ok(Token {
+                            origin: c_str,
+                            kind: TokenKind::Slash,
+                        }))
+                    }
+                }
 
                 Started::Number => {
                     let first_non_digit = c_onwards
@@ -270,7 +303,10 @@ impl<'de> Iterator for Lexer<'de> {
                             kind: yes,
                         }))
                     } else {
-                        just(no)
+                        Some(Ok(Token {
+                            origin: c_str,
+                            kind: no,
+                        }))
                     }
                 }
             };

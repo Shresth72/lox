@@ -1,6 +1,7 @@
 use clap::Parser;
 use clap::Subcommand;
 use lox::error::SingleTokenError;
+use lox::error::StringTerminationError;
 use miette::{IntoDiagnostic, WrapErr};
 use std::fs;
 use std::path::PathBuf;
@@ -42,6 +43,11 @@ fn main() -> miette::Result<()> {
                                 unrecognized.line(),
                                 unrecognized.token
                             );
+                        } else if let Some(unterminated) =
+                            e.downcast_ref::<StringTerminationError>()
+                        {
+                            any_cc_error = true;
+                            eprintln!("[line {}] Error: Unterminated string", unterminated.line());
                         }
                         continue;
                     }
